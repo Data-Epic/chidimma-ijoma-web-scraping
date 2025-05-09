@@ -6,43 +6,50 @@ from google.oauth2.service_account import Credentials
 from gspread_dataframe import set_with_dataframe
 import logging
 from io import StringIO
+from datetime import datetime
 
-# Set up logging configuration
+# ---------------------- Logging Configuration ----------------------
 logging.basicConfig(filename='history.log', level=logging.INFO,
                     format='%(asctime)s: %(levelname)s: %(message)s')
 
+# ---------------------- Google Sheets Setup ------------------------
+try:
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_file("GOOGLE_SHEETS_CREDS.json", scopes=scopes)
+    client = gspread.authorize(creds)
+    sheet_id = "1cLKSFOBpPct27Ttgk0hbb6Rt5uLRJ1r1v5FC_CD3WPM"
+    sheet = client.open_by_key(sheet_id)
+    sheet.update_title("2024/2025 Premier League Statistics")
 
-# Set up Google Sheets credentials
-scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-creds = Credentials.from_service_account_file("GOOGLE_SHEETS_CREDS.json", scopes=scopes)
-client = gspread.authorize(creds)
-sheet_id = "1cLKSFOBpPct27Ttgk0hbb6Rt5uLRJ1r1v5FC_CD3WPM"  # Replace with your Google Sheet ID
+    # Rename or create worksheet
+    try:
+        worksheet = sheet.worksheet("Overview")
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = sheet.add_worksheet(title="Overview", rows="100", cols="20")
+    else:
+        worksheet.clear()
+except Exception as e:
+    logging.error(f"Failed to set up Google Sheets: {e}")
+    raise Exception("Google Sheets setup failed. Check credentials and permissions.")
 
-# Open your sheet
-sheet = client.open_by_key(sheet_id)
-worksheet = sheet.worksheet("Sheet1")
-
-# Define the URL of the website to scrape
+# ---------------------- Web Scraping ------------------------
 url = "https://fbref.com/en/comps/9/Premier-League-Stats"
 
-# Send a GET request to the website
-page = urlopen(url)
-html = page.read().decode("utf-8")
-soup = BeautifulSoup(html, "lxml")
-
-league_table = soup.find("table", {"id": "results2024-202591_overall"})
-if league_table is None:
-    logging.error("League table not found on the page.")
-    raise Exception("League table not found on the page.")
-
 try:
+    page = urlopen(url)
+    html = page.read().decode("utf-8")
+    soup = BeautifulSoup(html, "lxml")
+    league_table = soup.find("table", {"id": "results2024-202591_overall"})
+
+    if league_table is None:
+        raise ValueError("League table not found in the HTML.")
+
     df = pd.read_html(StringIO(str(league_table)))[0]
-except ValueError as e:
-    logging.error(f"Error reading HTML table: {e}")
-    raise Exception(f"Error reading HTML table: {e}")
+except Exception as e:
+    logging.error(f"Failed to scrape or parse league table: {e}")
+    raise Exception("Scraping failed. Check if the table ID or URL has changed.")
 
-
-# Step 1: Rename columns using a dictionary
+# ---------------------- Data Cleaning & Transformation ------------------------
 rename_map = {
     "Rk": "Rank",
     "Squad": "Team",
@@ -63,19 +70,28 @@ rename_map = {
 
 df.rename(columns=rename_map, inplace=True)
 
-# Step 2: Split 'Top Team Scorer' into 'Top Scorer' and 'Top Scorer Goals'
+# Split 'Top Team Scorer' into two columns
 if "Top Team Scorer" in df.columns:
     split_cols = df["Top Team Scorer"].str.split(" - ", n=1, expand=True)
     df["Top Scorer"] = split_cols[0].str.strip()
     df["Top Scorer Goals"] = split_cols[1].str.strip() if split_cols.shape[1] > 1 else None
 
-# Step 3: Drop 'Notes' and 'Top Team Scorer' columns safely if they exist
+# Drop irrelevant columns
 columns_to_drop = [col for col in ["Notes", "Top Team Scorer"] if col in df.columns]
 if columns_to_drop:
     df.drop(columns=columns_to_drop, inplace=True)
 
-# Write updated DataFrame back to Google Sheets
-worksheet.clear()
-set_with_dataframe(worksheet, df)
+# Add timestamp
+df["Last Updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-print("Premier League Data successfully written to Google Sheets⚽.")
+# ---------------------- Export to Google Sheets ------------------------
+try:
+    set_with_dataframe(worksheet, df)
+    logging.info("Data successfully written to Google Sheets.")
+except Exception as e:
+    logging.error(f"Failed to write data to Google Sheets: {e}")
+    raise Exception("Data upload failed. Check worksheet access or format issues.")
+
+# ---------------------- Final Output ------------------------
+sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+print(f"✅ Premier League Data successfully written to Google Sheets ⚽\n📄 {sheet_url}")
