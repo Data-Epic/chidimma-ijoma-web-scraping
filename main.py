@@ -65,7 +65,7 @@ df.rename(columns=rename_map, inplace=True)
 
 # Step 2: Split 'Top Team Scorer' into 'Top Scorer' and 'Top Scorer Goals'
 if "Top Team Scorer" in df.columns:
-    split_cols = df["Top Team Scorer"].str.split("-", n=1, expand=True)
+    split_cols = df["Top Team Scorer"].str.split(" - ", n=1, expand=True)
     df["Top Scorer"] = split_cols[0].str.strip()
     df["Top Scorer Goals"] = split_cols[1].str.strip() if split_cols.shape[1] > 1 else None
 
@@ -73,3 +73,9 @@ if "Top Team Scorer" in df.columns:
 columns_to_drop = [col for col in ["Notes", "Top Team Scorer"] if col in df.columns]
 if columns_to_drop:
     df.drop(columns=columns_to_drop, inplace=True)
+
+# Write updated DataFrame back to Google Sheets
+worksheet.clear()
+set_with_dataframe(worksheet, df)
+
+print("Premier League Data successfully written to Google Sheets⚽.")
