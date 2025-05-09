@@ -53,6 +53,7 @@ except Exception as e:
 rename_map = {
     "Rk": "Rank",
     "Squad": "Team",
+    "MP": "Matches Played",
     "W": "Wins",
     "D": "Draws",
     "L": "Losses",
