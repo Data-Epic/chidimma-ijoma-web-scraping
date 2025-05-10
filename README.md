@@ -85,6 +85,7 @@ python main.py
 * **Sheet title length**: Google Sheets limits worksheet titles to 100 characters; long captions may cause errors.
 * **HTML Structure Changes**: Any changes to FBref’s HTML layout may break the scraping logic.
 * **No change tracking or historical backups**: The script overwrites the existing data without keeping previous versions.
+* **API Quotas**: Heavy or frequent use may exceed Google Sheets API quota limits.
 
 ---
 
