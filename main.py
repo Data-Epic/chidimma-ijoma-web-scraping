@@ -24,7 +24,6 @@ In order to run this script, you need to have the following:
 load_dotenv()
 sheet_id = os.getenv("SHEET_ID")
 
-
 # ---------------------- Logging Configuration ----------------------
 logging.basicConfig(filename='history.log', level=logging.INFO,
                     format='%(asctime)s: %(levelname)s: %(message)s')
@@ -42,12 +41,11 @@ except Exception as e:
 
 # Delete all worksheets from the spreadsheet
 worksheets = sheet.worksheets()
-
 for i, worksheet in enumerate(worksheets):
     if i != 0:  # Keep the first worksheet only
         sheet.del_worksheet(worksheet)
 
-sheet.get_worksheet(0).clear() # Clear the first worksheet
+sheet.get_worksheet(0).clear()  # Clear the first worksheet
 
 # ---------------------- Web Scraping ------------------------
 url = "https://fbref.com/en/comps/9/Premier-League-Stats"
@@ -57,9 +55,17 @@ try:
     html = page.read().decode("utf-8")
     soup = BeautifulSoup(html, "lxml")
     tables = soup.find_all("table")
+    columns = soup.find_all("th", {"scope": "col", "aria-label": True})
 except Exception as e:
     logging.error(f"Failed to scrape or parse page: {e}")
     raise Exception("Scraping failed. Check if the URL is correct and accessible.")
+
+# Dictionary to store mapping from visible text to aria-label
+column_rename_map = {}
+for col in columns:
+    text = col.text.strip()
+    aria_label = col["aria-label"].strip()
+    column_rename_map[text] = aria_label
 
 # ---------------------- Export Each Table to Google Sheets ------------------------
 for table in tables:
@@ -69,12 +75,37 @@ for table in tables:
         table_id = str(caption + "_" + tag)
         sheet_title = table_id if table_id else "Unnamed_Table"
 
+        # Truncate sheet title to 100 characters max (Google Sheets limit)
+        sheet_title = sheet_title[:100]
+
         df = pd.read_html(StringIO(str(table)))[0]
+
+        # Rename all columns using the mapping
+        df.rename(columns=column_rename_map, inplace=True)
 
         # Collapse multi-index columns if present
         if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [' '.join(col).strip() for col in df.columns.values]
-        
+            df.columns = [
+                ' '.join([lvl if not str(lvl).startswith('Unnamed') else '' for lvl in col]).strip()
+                for col in df.columns.values
+            ]
+
+        # Drop columns containing xG, xA, Expected, etc.
+        cols_to_drop = df.columns[df.columns.str.contains('xG|xA|Expectation|Expected')]
+        df.drop(cols_to_drop, axis=1, inplace=True)
+
+        # Create colnamer function to removed repeated words and keep name in order
+        def colnamer(name):
+            seen = set()
+            words = []
+            for word in name.split():
+                if word in seen:
+                    continue  # Skip the first duplicate
+                seen.add(word)
+                words.append(word)
+            return ' '.join(words)
+
+        df.columns = [colnamer(col) for col in df.columns]
 
         # Create or update worksheet
         try:
