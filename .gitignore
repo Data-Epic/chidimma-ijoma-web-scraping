@@ -175,3 +175,7 @@ cython_debug/
 
 # Google Sheet credentials
 GOOGLE_SHEETS_CREDS.json
+
+# Files for testing purposes and errors while programming. To be removed from gitignore when the project is complete.
+test.py
+downloaded_files
