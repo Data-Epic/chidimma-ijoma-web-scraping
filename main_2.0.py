@@ -195,6 +195,45 @@ for sheet_title, config in stat_configs.items():
         time.sleep(10)
         continue
 
+# ---------------------- Team Leaders (Top Scorer & Assister Per Team) ----------------------
+try:
+    print("⏳ Fetching Team Leaders...")
+    df_players = fbref.read_player_season_stats(stat_type="standard")
+    df_players = df_players.reset_index()
+
+    # Flatten multi-index columns first
+    df_players.columns = [' '.join(col).strip() for col in df_players.columns.values]
+
+    # Target the correct flattened column names
+    team_col = 'team'
+    player_col = 'player'
+    goal_col = 'Performance Gls'
+    assist_col = 'Performance Ast'
+
+    # Convert to numeric
+    df_players[goal_col] = pd.to_numeric(df_players[goal_col], errors='coerce').fillna(0)
+    df_players[assist_col] = pd.to_numeric(df_players[assist_col], errors='coerce').fillna(0)
+
+    # Top scorer per team
+    top_scorers = df_players.loc[df_players.groupby(team_col)[goal_col].idxmax()][
+        [team_col, player_col, goal_col]
+    ]
+    top_scorers.columns = ['Team', 'Top Scorer', 'Goals']
+
+    # Top assister per team
+    top_assisters = df_players.loc[df_players.groupby(team_col)[assist_col].idxmax()][
+        [team_col, player_col, assist_col]
+    ]
+    top_assisters.columns = ['Team', 'Top Assister', 'Assists']
+
+    # Merge into one clean table
+    team_leaders = pd.merge(top_scorers, top_assisters, on='Team').reset_index(drop=True)
+
+    write_to_sheet(sheet, "Team Leaders", team_leaders)
+
+except Exception as e:
+    logging.error(f"Failed to process Team Leaders: {e}")
+    print(f"❌ Team Leaders failed: {e}")
 
 # ---------------------- Final Output ----------------------
 sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
