@@ -235,6 +235,53 @@ except Exception as e:
     logging.error(f"Failed to process Team Leaders: {e}")
     print(f"❌ Team Leaders failed: {e}")
 
+# ---------------------- Goals and Assists ----------------------
+try:
+    print("⏳ Fetching Goals and Assists...")
+    df_league = fbref.read_player_season_stats(stat_type="standard")
+    df_league = df_league.reset_index()
+
+    # Flatten multi-index columns
+    df_league.columns = [' '.join(col).strip() for col in df_league.columns.values]
+
+    team_col = 'team'
+    player_col = 'player'
+    goal_col = 'Performance Gls'
+    assist_col = 'Performance Ast'
+
+    # Convert to numeric
+    df_league[goal_col] = pd.to_numeric(df_league[goal_col], errors='coerce').fillna(0)
+    df_league[assist_col] = pd.to_numeric(df_league[assist_col], errors='coerce').fillna(0)
+
+    # Top 20 scorers in the league
+    scorers = df_league[[team_col, player_col, goal_col]].sort_values(
+        by=goal_col, ascending=False
+    ).reset_index(drop=True)
+    scorers.columns = ['Team', 'Player', 'Goals']
+    scorers.index += 1  # Start ranking from 1
+
+    # Top 20 assisters in the league
+    assisters = df_league[[team_col, player_col, assist_col]].sort_values(
+        by=assist_col, ascending=False
+    ).reset_index(drop=True)
+    assisters.columns = ['Team', 'Player', 'Assists']
+    assisters.index += 1  # Start ranking from 1
+
+    # Combine side by side into one clean sheet
+    scorers = scorers.reset_index().rename(columns={'index': 'Rank'})
+    assisters = assisters.reset_index().rename(columns={'index': 'Rank'})
+
+    # Add a separator column then merge side by side
+    scorers[''] = ''
+    league_leaders = pd.concat([scorers, assisters], axis=1)
+
+    write_to_sheet(sheet, "Goals and Assists", league_leaders)
+
+except Exception as e:
+    logging.error(f"Failed to process Goals and Assists: {e}")
+    print(f"❌ Goals and Assists failed: {e}")
+
+
 # ---------------------- Final Output ----------------------
 sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
 print(f"✅ Premier League Data successfully written to Google Sheets ⚽\n📄 {sheet_url}")
