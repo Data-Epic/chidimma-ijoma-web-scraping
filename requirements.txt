@@ -1,6 +1,11 @@
 pandas
-beautifulsoup4
 gspread
-gspread_dataframe
 google-auth
+gspread-dataframe
+requests
+beautifulsoup4
+soccerdata
 python-dotenv
+cloudscraper
+playwright
+lxml

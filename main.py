@@ -1,6 +1,7 @@
 import pandas as pd
 from bs4 import BeautifulSoup
-from urllib.request import urlopen
+#from urllib.request import urlopen
+import requests
 import gspread
 from google.oauth2.service_account import Credentials
 from gspread_dataframe import set_with_dataframe
@@ -35,7 +36,7 @@ try:
     creds = Credentials.from_service_account_file("GOOGLE_SHEETS_CREDS.json", scopes=scopes)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(sheet_id)
-    sheet.update_title("2024/2025 Premier League Statistics")
+    sheet.update_title("2025/2026 Premier League Statistics")
 except Exception as e:
     logging.error(f"Failed to set up Google Sheets: {e}")
     raise Exception("Google Sheets setup failed. Check credentials and permissions.")
@@ -53,8 +54,13 @@ sheet.get_worksheet(0).clear() # Clear the first worksheet
 url = "https://fbref.com/en/comps/9/Premier-League-Stats"
 
 try:
-    page = urlopen(url)
-    html = page.read().decode("utf-8")
+    #page = urlopen(url)
+    #html = page.read().decode("utf-8")
+    headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+    response = requests.get(url, headers=headers)
+    html = response.text
     soup = BeautifulSoup(html, "lxml")
     tables = soup.find_all("table")
 except Exception as e:
