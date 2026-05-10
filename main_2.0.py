@@ -19,13 +19,20 @@ api_key = os.getenv("FOOTBALL_API_KEY")
 logging.basicConfig(filename='history_comprehensive.log', level=logging.INFO,
                     format='%(asctime)s: %(levelname)s: %(message)s')
 
-# ---------------------- Google Sheets Setup ----------------------
+# ---------------------- Soccerdata Setup ----------------------
+fbref = sd.FBref(leagues="ENG-Premier League", seasons="2025-2026")
+
+# ---------------------- Football Data API Setup ----------------------
+api_headers = {"X-Auth-Token": api_key}
+base_url = "https://api.football-data.org/v4"
+
+# ---------------------- Google Sheets API Setup ----------------------
 try:
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = Credentials.from_service_account_file("GOOGLE_SHEETS_CREDS.json", scopes=scopes)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(sheet_id)
-    sheet.update_title("2024/2025 Premier League Comprehensive Statistics")
+    sheet.update_title("2025/2026 Premier League Comprehensive Statistics")
 except Exception as e:
     logging.error(f"Failed to set up Google Sheets: {e}")
     raise Exception("Google Sheets setup failed. Check credentials and permissions.")
@@ -47,7 +54,7 @@ def clear_workbook(sheet):
                 sheet.del_worksheet(worksheet)
         first_sheet = sheet.get_worksheet(0)
         first_sheet.clear()
-        first_sheet.update_title("Standard Stats") # Rename it ready for the loop
+        first_sheet.update_title("Standings") # Rename it ready for the loop
         logging.info("Workbook cleared successfully.")
     except Exception as e:
         logging.error(f"Failed to clear workbook: {e}")
@@ -72,12 +79,8 @@ def write_to_sheet(sheet, title, df):
     logging.info(f"'{title}' successfully written to Google Sheets.")
     print(f"✅ '{title}' written successfully.")
 
-# ---------------------- Soccerdata Setup ----------------------
-fbref = sd.FBref(leagues="ENG-Premier League", seasons="2024-2025")
-
-# ---------------------- Football Data API Setup ----------------------
-api_headers = {"X-Auth-Token": api_key}
-base_url = "https://api.football-data.org/v4"
+# ---------------------- Clear Workbook ----------------------
+clear_workbook(sheet)
 
 # ---------------------- Team Stat Types ----------------------
 stat_types = {
@@ -167,10 +170,71 @@ stat_configs = {
     }
 }
 
-# ---------------------- Clear Workbook ----------------------
-clear_workbook(sheet)
+# ---------------------- 1. Standings ----------------------
+try:
+    print("⏳ Fetching Standings...")
+    response = requests.get(
+        f"{base_url}/competitions/PL/standings",
+        headers=api_headers,
+        timeout=30
+        )
+    data = response.json()
+    table = data["standings"][0]["table"]
 
-# ---------------------- Pull & Write Team Stats ----------------------
+    standings_rows = []
+    for entry in table:
+        standings_rows.append({
+            "Position": entry["position"],
+            "Team": entry["team"]["name"],
+            "Played": entry["playedGames"],
+            "Won": entry["won"],
+            "Drawn": entry["draw"],
+            "Lost": entry["lost"],
+            "Points": entry["points"],
+            "Goals For": entry["goalsFor"],
+            "Goals Against": entry["goalsAgainst"],
+            "Goal Difference": entry["goalDifference"]
+        })
+
+    standings_df = pd.DataFrame(standings_rows)
+    write_to_sheet(sheet, "Standings", standings_df)
+
+except Exception as e:
+    logging.error(f"Failed to process Standings: {e}")
+    print(f"❌ Standings failed: {e}")
+
+# ---------------------- 2. Match Results ----------------------
+try:
+    print("⏳ Fetching Match Results...")
+    response = requests.get(
+        f"{base_url}/competitions/PL/matches",
+        headers=api_headers,
+        timeout=30
+        )
+    data = response.json()
+    matches = data["matches"]
+
+    match_rows = []
+    for match in matches:
+        match_rows.append({
+            "Matchday": match["matchday"],
+            "Date": match["utcDate"][:10],
+            "Home Team": match["homeTeam"]["name"],
+            "Away Team": match["awayTeam"]["name"],
+            "Home Goals": match["score"]["fullTime"]["home"],
+            "Away Goals": match["score"]["fullTime"]["away"],
+            "Status": match["status"]
+        })
+
+    matches_df = pd.DataFrame(match_rows)
+    write_to_sheet(sheet, "Match Results", matches_df)
+
+except Exception as e:
+    logging.error(f"Failed to process Match Results: {e}")
+    print(f"❌ Match Results failed: {e}")
+
+
+# ---------------------- 3. Team Stats ----------------------
 for sheet_title, config in stat_configs.items():
     try:
         print(f"⏳ Fetching {sheet_title}...")
@@ -201,7 +265,7 @@ for sheet_title, config in stat_configs.items():
         time.sleep(10)
         continue
 
-# ---------------------- Team Leaders (Top Scorer & Assister Per Team) ----------------------
+# ---------------------- 4. Team Leaders (Top Scorer & Assister Per Team) ----------------------
 try:
     print("⏳ Fetching Team Leaders...")
     df_players = fbref.read_player_season_stats(stat_type="standard")
@@ -241,7 +305,7 @@ except Exception as e:
     logging.error(f"Failed to process Team Leaders: {e}")
     print(f"❌ Team Leaders failed: {e}")
 
-# ---------------------- Goals and Assists ----------------------
+# ---------------------- 5. Goals and Assists ----------------------
 try:
     print("⏳ Fetching Goals and Assists...")
     df_league = fbref.read_player_season_stats(stat_type="standard")
@@ -286,69 +350,6 @@ try:
 except Exception as e:
     logging.error(f"Failed to process Goals and Assists: {e}")
     print(f"❌ Goals and Assists failed: {e}")
-
-# ---------------------- Standings ----------------------
-try:
-    print("⏳ Fetching Standings...")
-    response = requests.get(
-        f"{base_url}/competitions/PL/standings",
-        headers=api_headers,
-        timeout=30
-        )
-    data = response.json()
-    table = data["standings"][0]["table"]
-
-    standings_rows = []
-    for entry in table:
-        standings_rows.append({
-            "Position": entry["position"],
-            "Team": entry["team"]["name"],
-            "Played": entry["playedGames"],
-            "Won": entry["won"],
-            "Drawn": entry["draw"],
-            "Lost": entry["lost"],
-            "Points": entry["points"],
-            "Goals For": entry["goalsFor"],
-            "Goals Against": entry["goalsAgainst"],
-            "Goal Difference": entry["goalDifference"]
-        })
-
-    standings_df = pd.DataFrame(standings_rows)
-    write_to_sheet(sheet, "Standings", standings_df)
-
-except Exception as e:
-    logging.error(f"Failed to process Standings: {e}")
-    print(f"❌ Standings failed: {e}")
-
-# ---------------------- Match Results ----------------------
-try:
-    print("⏳ Fetching Match Results...")
-    response = requests.get(
-        f"{base_url}/competitions/PL/matches",
-        headers=api_headers,
-        timeout=30
-        )
-    data = response.json()
-    matches = data["matches"]
-
-    match_rows = []
-    for match in matches:
-        match_rows.append({
-            "Matchday": match["matchday"],
-            "Date": match["utcDate"][:10],
-            "Home Team": match["homeTeam"]["name"],
-            "Away Team": match["awayTeam"]["name"],
-            "Home Goals": match["score"]["fullTime"]["home"],
-            "Away Goals": match["score"]["fullTime"]["away"],
-            "Status": match["status"]
-        })
-
-    matches_df = pd.DataFrame(match_rows)
-    write_to_sheet(sheet, "Match Results", matches_df)
-
-except Exception as e:
-    logging.error(f"Failed to process Match Results: {e}")
-    print(f"❌ Match Results failed: {e}")
 
 
 # ---------------------- Final Output ----------------------
