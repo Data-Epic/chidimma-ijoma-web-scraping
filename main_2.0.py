@@ -6,12 +6,14 @@ import logging
 from datetime import datetime
 from dotenv import load_dotenv
 import soccerdata as sd
+import requests
 import time
 import os
 
 # ---------------------- Load Environment Variables ----------------------
 load_dotenv()
 sheet_id = os.getenv("SHEET_ID")
+api_key = os.getenv("FOOTBALL_API_KEY")
 
 # ---------------------- Logging Configuration ----------------------
 logging.basicConfig(filename='history_comprehensive.log', level=logging.INFO,
@@ -72,6 +74,10 @@ def write_to_sheet(sheet, title, df):
 
 # ---------------------- Soccerdata Setup ----------------------
 fbref = sd.FBref(leagues="ENG-Premier League", seasons="2024-2025")
+
+# ---------------------- Football Data API Setup ----------------------
+api_headers = {"X-Auth-Token": api_key}
+base_url = "https://api.football-data.org/v4"
 
 # ---------------------- Team Stat Types ----------------------
 stat_types = {
@@ -280,6 +286,39 @@ try:
 except Exception as e:
     logging.error(f"Failed to process Goals and Assists: {e}")
     print(f"❌ Goals and Assists failed: {e}")
+
+# ---------------------- Standings ----------------------
+try:
+    print("⏳ Fetching Standings...")
+    response = requests.get(
+        f"{base_url}/competitions/PL/standings",
+        headers=api_headers,
+        timeout=30
+        )
+    data = response.json()
+    table = data["standings"][0]["table"]
+
+    standings_rows = []
+    for entry in table:
+        standings_rows.append({
+            "Position": entry["position"],
+            "Team": entry["team"]["name"],
+            "Played": entry["playedGames"],
+            "Won": entry["won"],
+            "Drawn": entry["draw"],
+            "Lost": entry["lost"],
+            "Points": entry["points"],
+            "Goals For": entry["goalsFor"],
+            "Goals Against": entry["goalsAgainst"],
+            "Goal Difference": entry["goalDifference"]
+        })
+
+    standings_df = pd.DataFrame(standings_rows)
+    write_to_sheet(sheet, "Standings", standings_df)
+
+except Exception as e:
+    logging.error(f"Failed to process Standings: {e}")
+    print(f"❌ Standings failed: {e}")
 
 
 # ---------------------- Final Output ----------------------
