@@ -320,6 +320,36 @@ except Exception as e:
     logging.error(f"Failed to process Standings: {e}")
     print(f"❌ Standings failed: {e}")
 
+# ---------------------- Match Results ----------------------
+try:
+    print("⏳ Fetching Match Results...")
+    response = requests.get(
+        f"{base_url}/competitions/PL/matches",
+        headers=api_headers,
+        timeout=30
+        )
+    data = response.json()
+    matches = data["matches"]
+
+    match_rows = []
+    for match in matches:
+        match_rows.append({
+            "Matchday": match["matchday"],
+            "Date": match["utcDate"][:10],
+            "Home Team": match["homeTeam"]["name"],
+            "Away Team": match["awayTeam"]["name"],
+            "Home Goals": match["score"]["fullTime"]["home"],
+            "Away Goals": match["score"]["fullTime"]["away"],
+            "Status": match["status"]
+        })
+
+    matches_df = pd.DataFrame(match_rows)
+    write_to_sheet(sheet, "Match Results", matches_df)
+
+except Exception as e:
+    logging.error(f"Failed to process Match Results: {e}")
+    print(f"❌ Match Results failed: {e}")
+
 
 # ---------------------- Final Output ----------------------
 sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
