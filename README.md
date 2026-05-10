@@ -147,16 +147,16 @@ python main_2.0.py
 ---
 
 ## ✅ Output Example
-✅ 'Standings' written successfully.
-✅ 'Match Results' written successfully.
-✅ 'Standard Stats' written successfully.
-✅ 'Shooting' written successfully.
-✅ 'Goalkeeping' written successfully.
-✅ 'Playing Time' written successfully.
-✅ 'Misc Stats' written successfully.
-✅ 'Team Leaders' written successfully.
-✅ 'Goals and Assists' written successfully.
-✅ Premier League Data successfully written to Google Sheets ⚽
+✅ 'Standings' written successfully.  
+✅ 'Match Results' written successfully.  
+✅ 'Standard Stats' written successfully.  
+✅ 'Shooting' written successfully.  
+✅ 'Goalkeeping' written successfully.  
+✅ 'Playing Time' written successfully.  
+✅ 'Misc Stats' written successfully.  
+✅ 'Team Leaders' written successfully.  
+✅ 'Goals and Assists' written successfully.  
+✅ Premier League Data successfully written to Google Sheets⚽  
 📄 https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE
 
 ---
